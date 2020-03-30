@@ -1,0 +1,70 @@
+<?xml version="1.0" encoding="utf-8"?>
+<androidx.constraintlayout.widget.ConstraintLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    xmlns:app="http://schemas.android.com/apk/res-auto">
+    <Button
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:id="@+id/bAudCap"
+        android:onClick="captureAudio"
+        android:text="startcap"
+        android:layout_marginTop="10dp"
+        app:layout_constraintLeft_toLeftOf="parent"
+        app:layout_constraintTop_toTopOf="parent"></Button>
+
+
+    <Button
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:id="@+id/bAudCapEnc"
+        android:onClick="captureEncAudio"
+        android:text="startCapEnc"
+        android:layout_marginTop="10dp"
+        app:layout_constraintLeft_toLeftOf="parent"
+        app:layout_constraintTop_toBottomOf="@id/bAudCap"></Button>
+
+
+    <Button
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:id="@+id/bRawAudPly"
+        android:onClick="playRawAudio"
+        android:text="startPlyRaw"
+        android:layout_marginTop="10dp"
+        app:layout_constraintLeft_toLeftOf="parent"
+        app:layout_constraintTop_toBottomOf="@id/bAudCapEnc"></Button>
+
+
+    <Button
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:id="@+id/bDecAudPly"
+        android:onClick="playDecAudio"
+        android:text="startPlyDec"
+        android:layout_marginTop="10dp"
+        app:layout_constraintLeft_toLeftOf="parent"
+        app:layout_constraintTop_toBottomOf="@id/bRawAudPly"></Button>
+
+    <Button
+        android:id="@+id/bVolRaise"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="10dp"
+        android:layout_marginRight="100dp"
+        android:onClick="adjustVolumeRaise"
+        android:text="+"
+        app:layout_constraintRight_toLeftOf="@id/bVolLower"
+        app:layout_constraintTop_toBottomOf="@id/bDecAudPly"></Button>
+
+    <Button
+        android:id="@+id/bVolLower"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginLeft="100dp"
+        android:layout_marginTop="10dp"
+        android:onClick="adjustVolumeLower"
+        android:text="-"
+        app:layout_constraintLeft_toRightOf="@id/bVolRaise"
+        app:layout_constraintTop_toBottomOf="@id/bDecAudPly"></Button>
+</androidx.constraintlayout.widget.ConstraintLayout>

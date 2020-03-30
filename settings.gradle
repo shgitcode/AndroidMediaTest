@@ -1,0 +1,2 @@
+include ':app', ':mediasdk'
+rootProject.name='app'

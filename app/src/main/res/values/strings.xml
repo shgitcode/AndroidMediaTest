@@ -1,0 +1,9 @@
+<resources>
+    <string name="app_name">AndroidMediaTest</string>
+
+    <string name="cameraPreview">相机预览</string>
+    <string name="encToDec">相机自环</string>
+    <string name="localVidDec">本地视频解码</string>
+    <string name="audRecordTrack">音频录音播放</string>
+    <string name="cameraEnc">startEnc</string>
+</resources>
