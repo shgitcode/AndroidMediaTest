@@ -211,6 +211,16 @@ public class CMCDecWrapper {
     public void release(){
         Log.d(TAG,"release! ");
 
+        m_bIsCreate = false;
+
+        if (m_cDataQueue != null) {
+            m_cDataQueue.quit();
+        }
+
+        if (m_cRawQueue != null) {
+            m_cRawQueue.quit();
+        }
+
         m_bDecStart = false;
         m_bIsThreadStop = true;
 
@@ -229,8 +239,19 @@ public class CMCDecWrapper {
         m_bIsCreate = false;
     }
 
-    private void releaseDecoder() {
+    public void destroy() {
+        if (m_cDataQueue != null) {
+            m_cDataQueue.clear();
+            m_cDataQueue = null;
+        }
 
+        if (m_cRawQueue != null) {
+            m_cRawQueue.clear();
+            m_cRawQueue = null;
+        }
+    }
+
+    private void releaseDecoder() {
         if (m_cMediaCodec != null) {
             m_cMediaCodec.stop();
             m_cMediaCodec.release();
@@ -351,7 +372,10 @@ public class CMCDecWrapper {
                 byte[] sOutData = new byte[cBufferInfo.size];
                 outputBuffer.get(sOutData);
                 //System.arraycopy(cBufferInfo., 0, sOutData, 0, sOutData.length);
-                m_cRawQueue.setData(sOutData); // 编码数据放入队列
+                if (m_cRawQueue != null) {
+                    m_cRawQueue.setData(sOutData); // 编码数据放入队列
+                }
+
             }
 
             m_cMediaCodec.releaseOutputBuffer(nOutputId, m_bNeedRender);
@@ -375,11 +399,14 @@ public class CMCDecWrapper {
                     CRawFrame sData = null;
 
                     sData = m_cDataQueue.getData();
-                    bIsEos = sData.m_bIsEos;
+                    if (sData != null) {
+                        bIsEos = sData.m_bIsEos;
 
-                    Log.d(TAG, "decRecv Frame EOS: "+bIsEos);
+                        Log.d(TAG, "decRecv Frame EOS: "+bIsEos);
 
-                    inputDecFrame(sData, sData.m_bIsEos,10);
+                        inputDecFrame(sData, sData.m_bIsEos,10);
+                    }
+
 
                     if (!bIsEos) {
                         outputRawFrame(10);

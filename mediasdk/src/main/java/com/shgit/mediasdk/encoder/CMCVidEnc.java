@@ -101,8 +101,8 @@ public class CMCVidEnc {
         return nRetVal;
     }
 
-    public void startMCEncoder() {
-        m_cMCEnc.startMediaCodec();
+    public void start() {
+        m_cMCEnc.start();
         m_bEncoding = true;
         m_bSending = true;
         m_bEncStop = false;
@@ -112,14 +112,20 @@ public class CMCVidEnc {
         return m_bEncStop;
     }
 
-    public void stopMCEncoder(){
+    public void stop(){
+        // 编码器
+        if (m_cMCEnc != null) {
+            m_cMCEnc.stop();
+        }
+
         m_bEncoding = false;
         m_bSending = false;
         m_bEncStop = true;
-        releaseMCEncoder();
+
+        release();
     }
 
-    public void releaseMCEncoder(){
+    public void release(){
 
         // 等待编码结束
         while (!m_bEncStop) {
@@ -145,17 +151,24 @@ public class CMCVidEnc {
             m_cSndThread = null;
         }
 
-        // 编码器
-        if (m_cMCEnc != null) {
-            m_cMCEnc.stopMediaCodec();
-        }
-
         // file
         if (m_cWriteFile != null) {
             m_cWriteFile.closeSavedFile();
         }
 
         m_bEncoding = false;
+    }
+
+    public void quitRawQueue(){
+        if (m_cRawDataQue != null) {
+            m_cRawDataQue.quit();
+        }
+    }
+
+    public void quitEncodedQueue(){
+        if (m_cEcodedDataQue != null) {
+            m_cEcodedDataQue.quit();
+        }
     }
 
     public void destroyMCEncoder() {
@@ -170,7 +183,7 @@ public class CMCVidEnc {
         }
 
         if (m_cMCEnc != null) {
-            m_cMCEnc.destroyMediaCodec();
+            m_cMCEnc.destroy();
         }
     }
 
@@ -218,7 +231,7 @@ public class CMCVidEnc {
     // 创建合适编码器
     private void createEncoderCodec() {
 
-        m_cMCEnc.createMediaCodec(MediaFormat.MIMETYPE_VIDEO_AVC);
+        m_cMCEnc.create(MediaFormat.MIMETYPE_VIDEO_AVC);
 
         createVideoFormat();
 
@@ -290,7 +303,7 @@ public class CMCVidEnc {
                 m_cMediaFormat.setInteger(MediaFormat.KEY_COLOR_FORMAT, m_nSupportFormat);
 
                 if(m_cMCEnc != null) {
-                    m_cMCEnc.configMediaCodec(m_cMediaFormat);
+                    m_cMCEnc.configure(m_cMediaFormat);
                 }
             }
 
@@ -368,6 +381,12 @@ public class CMCVidEnc {
 
                     if (isEos == 1) {// 数据全部取出
                         Log.d(TAG, "encRawData EOS frameNum: "+frameNum);
+                        m_bEncStop = true;
+                        //break;
+                    }
+
+                    if (m_bEncStop) {
+                        Log.d(TAG, "encRawData stop! ");
                         break;
                     }
 
@@ -378,12 +397,17 @@ public class CMCVidEnc {
 
                         Thread.sleep(delay);
 
-                        Log.d(TAG, "AudMCEncoder sleep: " + delay);
+                        Log.d(TAG, "encRawData sleep: " + delay);
                     } catch (InterruptedException e) {
                         e.printStackTrace();
                     }
 
                 }else{
+                    if (m_bEncStop) {
+                        Log.d(TAG, "encRawData stop! ");
+                        break;
+                    }
+
                     try {
                         Thread.sleep(10);
                     } catch (InterruptedException e) {
@@ -449,6 +473,11 @@ public class CMCVidEnc {
                         }
                         m_bEncStop = true;
                         Log.d(TAG, "SndEncData end! ");
+                        //break;
+                    }
+
+                    if (m_bEncStop) {
+                        Log.d(TAG, "SndEncData stop! ");
                         break;
                     }
 
@@ -462,6 +491,12 @@ public class CMCVidEnc {
                         e.printStackTrace();
                     }
                 }else{
+
+                    if (m_bEncStop) {
+                        Log.d(TAG, "SndEncData stop! ");
+                        break;
+                    }
+
                     try {
                         Thread.sleep(10);
                     } catch (InterruptedException e) {

@@ -65,7 +65,7 @@ public class CMCAudEnc {
             m_cEcodedDataQue.create(QUEUE_LENGTH,"audEncDataQue");
         }
 
-        nRetVal = m_cMCEnc.createMediaCodec(MediaFormat.MIMETYPE_AUDIO_AAC);
+        nRetVal = m_cMCEnc.create(MediaFormat.MIMETYPE_AUDIO_AAC);
 
         createAudioFormat();
 
@@ -84,7 +84,7 @@ public class CMCAudEnc {
     }
 
     public void startMCEncoder() {
-        m_cMCEnc.startMediaCodec();
+        m_cMCEnc.start();
         m_bEncoding = true;
         m_bEncStop = false;
     }
@@ -121,7 +121,7 @@ public class CMCAudEnc {
 
         // 编码器
         if (m_cMCEnc != null) {
-            m_cMCEnc.stopMediaCodec();
+            m_cMCEnc.stop();
             m_cMCEnc = null;
         }
 
@@ -169,12 +169,11 @@ public class CMCAudEnc {
         }
 
         if(m_cMCEnc != null) {
-            m_cMCEnc.configMediaCodec(m_cMediaFormat);
+            m_cMCEnc.configure(m_cMediaFormat);
         }
 
     }
-
-
+    
     // 编码线程
     Runnable encRawData = new Thread(new Runnable() {
         @Override

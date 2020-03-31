@@ -32,14 +32,15 @@ public class CMCEncWrapper {
     private byte[] m_sOutData;
     private String m_cEncTypeName = null;
     private int m_nEncFrameNum = 0;
-    private boolean m_bIsStoped = true;
+    // 编码标志
+    private boolean m_bIsEncoding = false;
 
     // 输入输出
     private ByteBuffer[] m_cInputBuffers = null;
     private ByteBuffer[] m_cOutputBuffers = null;
 
     // encoded data
-    private CDataQueue<byte[]> m_sDataQueue = null;
+    private CDataQueue<byte[]> m_cEncodedQueue = null;
     private boolean m_bIsOutputEos = false; // 表示输出端编码结束
     private boolean m_bSetInputEos = false; // 表示输入端是否成功输入EOS
 
@@ -47,87 +48,94 @@ public class CMCEncWrapper {
     private boolean m_bIsVideo = false;
 
     // csd
-    public byte[] m_sConfigbyte;
+    public byte[]        m_sConfigbyte;
     private boolean      m_bIsConfig = false;
 
     // thread
     private HandlerThread m_cEncHldThd = null;
 
-    // time
-    private long m_nEncStartTime = 0;
 
     public  CMCEncWrapper(boolean isVideo){
         Log.d(TAG, "Construction Video: "+isVideo);
         m_bIsVideo   = isVideo;
     }
 
-    public int createMediaCodec(String typeName) {
-        Log.d(TAG, "createMediaCodec name: "+typeName);
+    public int create(String typeName) {
+        Log.d(TAG, "create name: "+typeName);
 
         m_bIsConfig = false;
 
-        m_sDataQueue = new CDataQueue<>();
-        m_sDataQueue.create(QUEUE_LENGTH, "MCEncoderQue");
+        m_cEncodedQueue = new CDataQueue<>();
+        m_cEncodedQueue.create(QUEUE_LENGTH, "MCEncoderQue");
 
         listEncoderName();
 
         m_cEncTypeName = typeName;
 
-        createMCEncoder();
+        createMediaCodec();
 
         return 0;
     }
 
-    public void configMediaCodec(MediaFormat cMediaFormat){
+    public void configure(MediaFormat cMediaFormat){
         m_cInputMediaFormat = cMediaFormat;
-        configMCEncoder();
+        configureMediaCodec();
     }
 
+    public void start(){
+        Log.d(TAG, "start");
+
+        m_bIsOutputEos = false;
+        m_bSetInputEos = false;
+
+        m_bIsEncoding = true;
+    }
+
+    public void stop(){
+        Log.d(TAG, "stop");
+
+        if (m_cEncodedQueue != null) {
+            m_cEncodedQueue.quit();
+        }
+
+        m_bIsEncoding = false;
+
+        if (m_cEncHldThd != null) {
+            m_cEncHldThd.quit();
+            m_cEncHldThd = null;
+        }
+
+        m_bIsOutputEos = false;
+
+        releaseMediaCodec();
+    }
+
+    public void destroy() {
+        if (m_cEncodedQueue != null) {
+            m_cEncodedQueue.clear();
+            m_cEncodedQueue = null;
+        }
+    }
+
+    // 编码结束标志
     public boolean getOutputEos() {
         return m_bIsOutputEos;
     }
 
-    public void startMediaCodec(){
-        Log.d(TAG, "startMediaCodec");
-
-        m_nEncStartTime = System.nanoTime() / 1000;
-
-        m_bIsOutputEos = false;
-        m_bIsStoped = false;
-
-        m_bSetInputEos = false;
-
-        m_nEncStartTime = 0;
-    }
-
-    public void stopMediaCodec(){
-        Log.d(TAG, "stopMediaCodec");
-
-        m_bIsStoped = true;
-
-        m_cEncHldThd.quit();
-        m_cEncHldThd = null;
-
-        m_bIsOutputEos = false;
-
-        m_nEncStartTime = 0;
-
-        releaseMCEncoder();
-    }
-
-    public void destroyMediaCodec() {
-        if (m_sDataQueue != null) {
-            m_sDataQueue.clear();
-            m_sDataQueue = null;
-        }
-    }
-
     public byte[] getEncodedData() {
-        return m_sDataQueue.getData();
+        if (m_cEncodedQueue != null) {
+            return m_cEncodedQueue.getData();
+        }
+
+        return null;
     }
 
     public boolean encodedDataQueIsEmpty() {
-        return m_sDataQueue.isEmpty();
+        if (m_cEncodedQueue != null) {
+            return  m_cEncodedQueue.isEmpty();
+        }
+
+        return true;
     }
 
     public byte[] getEncodedCsd() {
@@ -140,12 +148,12 @@ public class CMCEncWrapper {
             return -1;
         }
 
-        if(m_bIsStoped){
+        if(!m_bIsEncoding){
             Log.e(TAG, "m_cMediaCodec is stop");
             return -1;
         }
 
-        Log.d(TAG, " m_cMediaCodec setRawData EOS: "+sRawData.m_bIsEos + " PTS: "+sRawData.presentationTimeUs);
+        Log.d(TAG, " setRawData EOS: "+sRawData.m_bIsEos + " PTS: "+sRawData.presentationTimeUs);
 
         Message message = m_cEncHandler.obtainMessage();
         message.what = 0x1;
@@ -196,19 +204,18 @@ public class CMCEncWrapper {
                     bIsEos = rawFrame.m_bIsEos;
                     if (!bIsEos) {
                         nRawLen = rawFrame.m_sFrame.length;
-                        Log.d(TAG, "Handler Raw data length: " +  nRawLen);
+                        Log.d(TAG, "EncHandler Raw length: " +  nRawLen);
                     }
 
-                    Log.d(TAG, "Handler Raw data FrameNum: " +  m_nFrameNum);
+                    Log.d(TAG, "EncHandler Raw FrameNum: " +  m_nFrameNum);
 
                     nRetVal = inputRawData(rawFrame.m_sFrame, bIsEos, rawFrame.presentationTimeUs,10);
-
                     if (nRetVal == 0) {
                         if (!bIsEos) {
                             nRetVal = outputEncodedData(10);
                         } else {
                             // 没有输入，取出缓存中所有编码数据
-                            Log.d(TAG, "handleMessage EOS");
+                            Log.d(TAG, "EncHandler handleMessage EOS");
                             while (!m_bIsOutputEos) {
                                 if (!m_bSetInputEos) {
                                     inputRawData(null, true, rawFrame.presentationTimeUs,1000);
@@ -335,8 +342,8 @@ public class CMCEncWrapper {
                     Log.d(TAG, "outputEncodedData Encoder EOS!");
 
                     if (bufferInfo.size > 0) {
-                        if (m_sDataQueue != null) {
-                            m_sDataQueue.setData(outData); // 编码数据放入队列
+                        if (m_cEncodedQueue != null) {
+                            m_cEncodedQueue.setData(outData); // 编码数据放入队列
                         }
                     }
 
@@ -360,8 +367,8 @@ public class CMCEncWrapper {
                     nRetval = m_sOutData.length;
                     m_nEncFrameNum++;
 
-                    if (m_sDataQueue != null) {
-                        m_sDataQueue.setData(m_sOutData); // 编码数据放入队列
+                    if (m_cEncodedQueue != null) {
+                        m_cEncodedQueue.setData(m_sOutData); // 编码数据放入队列
                     }
                 }
                 m_cMediaCodec.releaseOutputBuffer(nOutputId, false);
@@ -374,20 +381,20 @@ public class CMCEncWrapper {
         return nRetval;
     }
 
-    private void releaseMCEncoder() {
-        Log.d(TAG, "releaseMCEncoder !");
+    private void releaseMediaCodec() {
+        Log.d(TAG, "releaseMediaCodec !");
         if (m_cMediaCodec != null) {
             m_cMediaCodec.stop();
             m_cMediaCodec.release();
-            m_cMediaCodec = null;
         }
+        m_cMediaCodec = null;
     }
 
-    private void createMCEncoder(){
+    private void createMediaCodec(){
 
-        Log.d(TAG, "createMCEncoder : "+m_cEncTypeName);
+        Log.d(TAG, "createMediaCodec : "+m_cEncTypeName);
 
-        releaseMCEncoder();
+        releaseMediaCodec();
 
         try {
             m_cMediaCodec = MediaCodec.createEncoderByType(m_cEncTypeName);
@@ -397,9 +404,9 @@ public class CMCEncWrapper {
 
     }
 
-    private void configMCEncoder(){
+    private void configureMediaCodec(){
 
-        Log.d(TAG, "configMCEncoder !");
+        Log.d(TAG, "configureMediaCodec !");
 
         if (m_cInputMediaFormat == null) {
             return;

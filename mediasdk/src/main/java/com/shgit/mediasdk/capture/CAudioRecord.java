@@ -26,11 +26,13 @@ public class CAudioRecord {
     private int m_nSampleRate  = 44100;
     private int m_nChannelConfig = AudioFormat.CHANNEL_IN_STEREO;
     private int m_nAudioFormat  = AudioFormat.ENCODING_PCM_16BIT;
+    // 缓存数
     private int m_nBufferSizeInBytes = 0;
     private int m_nMaxSizeInBytes = 0;
     private int m_nSamplesPerFrame = 1024 * 2 * m_nAudioFormat;
 
     private AudioRecord m_cAudRecord = null;
+    // 线程
     private boolean m_bIsRecording = false;
     private Thread m_cAudRecordThread = null;
     private byte[] m_sRawDataBuffer = null;
@@ -61,7 +63,8 @@ public class CAudioRecord {
         m_cWritePcmFile = new CFileManage();
         m_cWritePcmFile.createSavedFile("audRecord.pcm");
 
-        startRecord();
+        // 开启线程
+        startRecordThread();
 
         return 0;
     }
@@ -69,7 +72,7 @@ public class CAudioRecord {
     public int StopAudioRecord() {
         Log.d(TAG, " StopAudioRecord!");
 
-        destroy();
+        stopRecordThread();
 
         stopRecord();
 
@@ -81,6 +84,7 @@ public class CAudioRecord {
         return 0;
     }
 
+    // 清空队列
     public int clearDataQue() {
         Log.d(TAG, " clearDataQue!");
 
@@ -169,7 +173,7 @@ public class CAudioRecord {
         return 0;
     }
 
-    private void  startRecord() {
+    private void  startRecordThread() {
         m_bIsRecording = true;
         if(m_cAudRecordThread == null) {
             m_cAudRecordThread = new Thread(audioRecord);
@@ -186,7 +190,7 @@ public class CAudioRecord {
         }
     }
 
-    private void destroy() {
+    private void stopRecordThread() {
         m_bIsRecording = false;
         try{
             if(m_cAudRecordThread != null) {
@@ -240,6 +244,7 @@ public class CAudioRecord {
                 }
             }
 
+            // 结束，插入EOS
             if (!m_bIsRecording) {
                 if (m_cDataQueue != null) {
                     CRawFrame cPcmData = new CRawFrame();

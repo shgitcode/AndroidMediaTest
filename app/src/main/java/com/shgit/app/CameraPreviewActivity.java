@@ -27,13 +27,14 @@ import androidx.core.content.ContextCompat;
 *  预览采集视频
 *  支持前后摄像头切换
 *  可以编码YUV数据，并保存为H264
+*  camera + handlerThread : https://www.jianshu.com/p/a6b51b7b2af9
 * */
 public class CameraPreviewActivity extends AppCompatActivity {
     private final String TAG = "CameraPreview";
     // 保存当前cameraID
     private final String STATE_CAMERA_ID = "currentCamId";
     // event
-    private final int EVENT_CREATE_CAMERA = 1;
+    private final int EVENT_OPEN_CAMERA = 1;
     private final int EVENT_SWITCH_CAMERA = 2;
     // 采集器
     private CVideoCapture m_cCapture = null;
@@ -72,12 +73,16 @@ public class CameraPreviewActivity extends AppCompatActivity {
 
         // 预览
         m_cSurfaceView = findViewById(R.id.cameraPreview);
-        m_cSurfaceHolder = m_cSurfaceView.getHolder();
         m_cSurfaceView.setOnClickListener(m_cClickHandler);
 
         // 编码
         m_cBtnEnc = findViewById(R.id.cameraEnc);
         m_cBtnEnc.setOnClickListener(m_cClickHandler);
+
+        // 创建采集器
+        m_cCapture = CVideoCapture.getInstance();
+        m_cSurfaceHolder = m_cSurfaceView.getHolder();
+        m_cSurfaceHolder.addCallback(m_cCapture.getCameraWrapper());
 
         // handler
         createHandler();
@@ -101,7 +106,7 @@ public class CameraPreviewActivity extends AppCompatActivity {
     protected  void onStart() {
         super.onStart();
         Log.d(TAG, "onStart");
-        sendEventMessage(EVENT_CREATE_CAMERA);
+        sendEventMessage(EVENT_OPEN_CAMERA);
     }
 
     @Override
@@ -130,9 +135,9 @@ public class CameraPreviewActivity extends AppCompatActivity {
             public void handleMessage(Message msg) {
                 Log.d(TAG, "handleMessage: "+msg.what);
                 switch(msg.what){
-                    case EVENT_CREATE_CAMERA:
+                    case EVENT_OPEN_CAMERA:
 
-                        createCamera((SurfaceHolder)msg.obj);
+                        openCamera((SurfaceView)msg.obj);
 
                         break;
 
@@ -161,8 +166,8 @@ public class CameraPreviewActivity extends AppCompatActivity {
         msg.what = event; //消息的标识
 
         switch(msg.what){
-            case EVENT_CREATE_CAMERA:
-                msg.obj = m_cSurfaceHolder;
+            case EVENT_OPEN_CAMERA:
+                msg.obj = m_cSurfaceView;
                 break;
 
             case EVENT_SWITCH_CAMERA:
@@ -186,9 +191,8 @@ public class CameraPreviewActivity extends AppCompatActivity {
         return 0;
     }
 
-    private int createCamera(SurfaceHolder surHld) {
-        // 创建采集器
-        m_cCapture = CVideoCapture.getInstance();
+    private int openCamera(SurfaceView surView) {
+        // 采集器
         if(m_cCapture == null){
             Log.e(TAG, "Get video Capture Instance error!");
             return -1;
@@ -223,7 +227,7 @@ public class CameraPreviewActivity extends AppCompatActivity {
 
         // 设置采集参数
         CaptureParam tCapParam = new CaptureParam();
-        tCapParam.cSurfaceHolder = surHld;
+        tCapParam.cSurfaceHolder = m_cSurfaceHolder;
         tCapParam.nWidth  = 640;
         tCapParam.nHeight = 480;
         tCapParam.nMaxFPS = 30;
@@ -255,7 +259,7 @@ public class CameraPreviewActivity extends AppCompatActivity {
         }
 
         if (m_cEncoder != null) {
-            m_cEncoder.stopMCEncoder();
+            m_cEncoder.stop();
             m_cEncoder = null;
         }
     }
@@ -303,7 +307,7 @@ public class CameraPreviewActivity extends AppCompatActivity {
             CVidInfo vidInfo = new CVidInfo(nWidth, nHeight, nFrameRate, 0);
             m_cEncoder.setMCParamter(vidInfo);
             m_cEncoder.createMCEncoder();
-            m_cEncoder.startMCEncoder();
+            m_cEncoder.start();
 
             // 开启队列
             m_cCapture.setCapDataQueue(true);

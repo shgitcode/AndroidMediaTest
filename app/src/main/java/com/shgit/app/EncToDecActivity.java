@@ -63,16 +63,13 @@ public class EncToDecActivity extends AppCompatActivity {
     private MediaFormat m_cEncDecFormat = null;
 
     // event
-    private final int EVENT_CREATE_CAMERA = 1;
+    private final int EVENT_OPEN_CAMERA = 1;
     private final int EVENT_SWITCH_CAMERA = 2;
 
     // 当前相机Id
     private int m_nCameraCurrentId = 0;
     // 相机数目
     private int m_nCameraNum = 0;
-
-    // 停止编解码
-    private boolean m_bStopEncDec = false;
 
     // 编码线程
     private Thread m_cEncThread = null;
@@ -104,18 +101,24 @@ public class EncToDecActivity extends AppCompatActivity {
         * */
         setContentView(R.layout.activity_enc_to_dec);
 
+        // 预览
         m_cCameraView  = findViewById(R.id.cameraSurface);
         m_cCameraHolder = m_cCameraView.getHolder();
 
         // 点击事件 --- 摄像头切换
         m_cCameraView.setOnClickListener(m_cClickHandler);
 
+        // 渲染
         m_cRenderView = findViewById(R.id.decSurface);
 
         // 从已保存状态中获取当前相机ID
         if (savedInstanceState != null) {
             m_nCameraCurrentId = savedInstanceState.getInt(STATE_CAMERA_ID);
         }
+
+        // 创建采集器
+        m_cCapture = CVideoCapture.getInstance();
+        m_cCameraHolder.addCallback(m_cCapture.getCameraWrapper());
 
         // handler
         createHandler();
@@ -125,7 +128,7 @@ public class EncToDecActivity extends AppCompatActivity {
         m_cCameraResolutionSync = m_cCameraResolutionLock.newCondition();
 
         // 开启相机
-        sendEventMessage(EVENT_CREATE_CAMERA);
+        sendEventMessage(EVENT_OPEN_CAMERA);
 
         // 开启编解码线程
         startEncCamera();
@@ -151,11 +154,25 @@ public class EncToDecActivity extends AppCompatActivity {
         Log.d(TAG, "onStop");
 
         // 停止采集
-        m_cCapture.stop();
+        if (m_cCapture != null) {
+            m_cCapture.quitDataQueue();
+            m_cCapture.stop();
+        }
 
-        m_bStopEncDec = true;
+        // 停止编码
+        m_bEncoding = false;
+        if (m_cEncoder != null) {
+            m_cEncoder.quitRawQueue();
+            m_cEncoder.quitEncodedQueue();
+        }
 
-        // 停止编解码
+        // 停止解码
+        m_bDecoding = false;
+        if (m_cDecoder != null) {
+            m_cEncoder.quitRawQueue();
+            m_cEncoder.quitEncodedQueue();
+        }
+
         releaseEncCamera();
     }
 
@@ -178,7 +195,7 @@ public class EncToDecActivity extends AppCompatActivity {
         }
 
         if (m_cDecoder != null) {
-           // m_cDecoder.;
+            m_cDecoder.destroy();
             m_cDecoder = null;
         }
 
@@ -193,9 +210,9 @@ public class EncToDecActivity extends AppCompatActivity {
             public void handleMessage(Message msg) {
                 Log.d(TAG, "handleMessage : "+msg.what);
                 switch(msg.what){
-                    case EVENT_CREATE_CAMERA:
+                    case EVENT_OPEN_CAMERA:
 
-                        createCamera();
+                        openCamera();
 
                         break;
 
@@ -228,9 +245,8 @@ public class EncToDecActivity extends AppCompatActivity {
         return 0;
     }
 
-    private int createCamera() {
-        // 创建采集器
-        m_cCapture = CVideoCapture.getInstance();
+    private int openCamera() {
+        // 采集器
         if(m_cCapture == null){
             Log.e(TAG, "Get video Capture Instance error!");
             return -1;
@@ -278,14 +294,13 @@ public class EncToDecActivity extends AppCompatActivity {
         // 通知
         m_cCameraResolutionLock.lock();
         m_cCameraResolutionSync.signalAll();
+        m_cCameraResolutionLock.unlock();
 
         return 0;
     }
 
     private void startEncCamera() {
         m_cOutputFormatSync = new Object();
-
-        m_bStopEncDec = false;
 
         m_cEncThread = new Thread(encCameraData);
         m_cEncThread.start();
@@ -298,6 +313,8 @@ public class EncToDecActivity extends AppCompatActivity {
 
     private void releaseEncCamera() {
 
+        Log.d(TAG, "releaseEncCamera");
+
         if (m_cEncThread != null) {
             try {
                 m_cEncThread.join();
@@ -308,7 +325,7 @@ public class EncToDecActivity extends AppCompatActivity {
         }
 
         if (m_cEncoder != null) {
-            m_cEncoder.stopMCEncoder();
+            m_cEncoder.stop();
         }
 
         if (m_cDecThread != null) {
@@ -327,10 +344,11 @@ public class EncToDecActivity extends AppCompatActivity {
 
     // 编码线程
     Runnable encCameraData = new Thread(new Runnable() {
+        private Thread thisThread = null;
         @Override
         public void run() {
             boolean bIsEos = false;
-            int delay = 10;
+            int delay = 0;
             int frameNum = 0;
 
             int nWidth = 640;
@@ -345,22 +363,16 @@ public class EncToDecActivity extends AppCompatActivity {
                 return;
             }
 
+            thisThread = Thread.currentThread();
+
             // 等待采集分辨率
-            /*
             m_cCameraResolutionLock.lock();
             try {
                 m_cCameraResolutionSync.await();
             } catch (InterruptedException e) {
                 e.printStackTrace();
-            }
-             */
-
-            while (m_cCapture.getCapInfo() == null) {
-                try {
-                    Thread.sleep(1);
-                } catch (InterruptedException e) {
-                    e.printStackTrace();
-                }
+            } finally {
+                m_cCameraResolutionLock.unlock();
             }
 
             // 获取采集分辨率
@@ -375,21 +387,10 @@ public class EncToDecActivity extends AppCompatActivity {
             CVidInfo vidInfo = new CVidInfo(nWidth, nHeight, nFrameRate, 0);
             m_cEncoder.setMCParamter(vidInfo);
             m_cEncoder.createMCEncoder();
-            m_cEncoder.startMCEncoder();
+            m_cEncoder.start();
 
             while (m_bEncoding) {
-
-                if (m_bStopEncDec) {
-                    // 停止编码
-                    if (m_cEncoder != null) {
-                        cRawData = new CRawFrame();
-                        cRawData.m_bIsEos = true;
-                        m_cEncoder.setRawData(cRawData);
-                    }
-
-                    Log.d(TAG, "encCameraData stop encode EOS!");
-                    break;
-                }
+                delay = 1;
                 // 取得编码后输出格式
                 if (m_cEncDecFormat == null) {
                     m_cEncDecFormat = m_cEncoder.getOutputMediaFormat();
@@ -432,10 +433,12 @@ public class EncToDecActivity extends AppCompatActivity {
                 }
             }
         }
+
     });
 
     // 解码编码数据线程
     Runnable decEncData = new Thread(new Runnable() {
+        private Thread thisThread = null;
         @Override
         public void run() {
             boolean bIsEos = false;
@@ -445,6 +448,8 @@ public class EncToDecActivity extends AppCompatActivity {
             CRawFrame cRawData = null;
 
             Log.d(TAG, "decEncData!");
+
+            thisThread = Thread.currentThread();
 
             m_cDecoder = new CMCVidDec();
             m_cDecoder.create(m_cRenderView.getHolder().getSurface(), MediaFormat.MIMETYPE_VIDEO_AVC);
@@ -462,7 +467,6 @@ public class EncToDecActivity extends AppCompatActivity {
             m_cDecoder.start();
 
             while (m_bDecoding) {
-
                 cRawData = m_cEncoder.getEncodedData();
                 if(cRawData != null){
                     if (cRawData.m_bIsEos) {
@@ -488,7 +492,7 @@ public class EncToDecActivity extends AppCompatActivity {
                             }
                         }
                         Log.d(TAG, "decEncData stop EOS!");
-                        m_bDecoding = true;
+                        m_bDecoding = false;
                         break;
                     }
                 }
@@ -506,7 +510,7 @@ public class EncToDecActivity extends AppCompatActivity {
         @Override
         public void onClick(View view) {
             switch(view.getId()) {
-                case R.id.cameraPreview:
+                case R.id.cameraSurface:
                     sendEventMessage(EVENT_SWITCH_CAMERA);
                     break;
 

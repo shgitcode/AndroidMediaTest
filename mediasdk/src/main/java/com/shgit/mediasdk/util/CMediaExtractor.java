@@ -244,7 +244,6 @@ public class CMediaExtractor {
 
     }
 
-
     // 获取音视频轨道信息
     private  int getTrackIndex() {
         if (m_cMediaExtractor == null) {
@@ -273,7 +272,6 @@ public class CMediaExtractor {
 
     // 视频媒体信息
     private int getVideoMediaFormat(){
-
         if (m_cMediaExtractor == null) {
             return 1;
         }

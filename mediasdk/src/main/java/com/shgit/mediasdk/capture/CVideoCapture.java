@@ -17,8 +17,8 @@ public class CVideoCapture {
     private static volatile CVideoCapture s_cCapture = null;
 
     private CVideoCapture(){
-        m_cCamCap = null;
         Log.d(TAG, "construct!");
+        m_cCamCap = new CCameraWrapper();
     }
 
     public static CVideoCapture getInstance(){
@@ -32,6 +32,9 @@ public class CVideoCapture {
         return s_cCapture;
     }
 
+    public CCameraWrapper getCameraWrapper() {
+        return m_cCamCap;
+    }
     /*
      * 需先调用setContext设置context
      * */
@@ -42,9 +45,8 @@ public class CVideoCapture {
             return -1;
         }
 
-        m_cCamCap = new CCameraWrapper();
-        if(null == m_cCamCap){
-            Log.e(TAG, "CCameraWrapper allocate failed");
+        if (m_cCamCap == null) {
+            Log.e(TAG, "CameraWrapper instance null!");
             return -1;
         }
 
@@ -140,6 +142,12 @@ public class CVideoCapture {
     public void setCapDataQueue(boolean bNeed) {
         if(m_cCamCap != null){
             m_cCamCap.setCapDataQueue(bNeed);
+        }
+    }
+
+    public void quitDataQueue(){
+        if(m_cCamCap != null){
+            m_cCamCap.quitDataQueue();
         }
     }
 

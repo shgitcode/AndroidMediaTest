@@ -33,7 +33,7 @@ public class CCameraWrapper implements SurfaceHolder.Callback {
     private final int MAX_CAP_YUV_LENGTH = MAX_CAP_WIDTH * MAX_CAP_HEIGHT * 3 / 2;
     private final int QUEUE_LENGTH = 10;
 
-    // 存储采集数据
+    // 文件存储采集数据
     private boolean     m_bNeedSaveFile = false;
     private int         m_nSaveYuvNum = 10;
     private String      m_sSaveileName = "/cap.yuv";
@@ -90,7 +90,6 @@ public class CCameraWrapper implements SurfaceHolder.Callback {
     * bNeedQueue: 如需编码设为true
     * */
     public int create(int camId, boolean bNeedQueue){
-
         Log.d(TAG, "create, need queue: " + bNeedQueue);
 
         if(m_bCreateFlag){
@@ -146,9 +145,12 @@ public class CCameraWrapper implements SurfaceHolder.Callback {
 
         // 为SurfaceHolder添加回调
         m_cHolder  = tCapParam.cSurfaceHolder;
-        m_cHolder.addCallback(this);
+        //m_cHolder.addCallback(this);
 
         m_bStopCapture = false;
+
+        // 开启预览
+        refreshCamera();
 
         return 0;
     }
@@ -265,6 +267,12 @@ public class CCameraWrapper implements SurfaceHolder.Callback {
         }
     }
 
+    public void quitDataQueue(){
+        if(m_cYuvDataQueue != null){
+            m_cYuvDataQueue.quit();
+        }
+    }
+
     public CRawFrame getCapFrame() {
         boolean bIsEos = false;
         CRawFrame cRawData = null;
@@ -306,14 +314,14 @@ public class CCameraWrapper implements SurfaceHolder.Callback {
             return;
         }
 
-        m_cHolder = holder;
+        //m_cHolder = holder;
     }
 
     @Override
     public void surfaceChanged(SurfaceHolder holder, int format, int width, int height){
         Log.d(TAG, "Camera surfaceChanged");
-        m_cHolder = holder;
-        refreshCamera();
+        //m_cHolder = holder;
+        //refreshCamera();
     }
 
     @Override

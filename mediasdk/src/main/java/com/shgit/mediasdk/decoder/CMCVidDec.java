@@ -145,4 +145,12 @@ public class CMCVidDec {
         m_bIsCreate = false;
     }
 
+    public void destroy(){
+        Log.d(TAG,"destroy!");
+
+        if (m_cMCDec != null) {
+            m_cMCDec.destroy();
+        }
+    }
+
 }
