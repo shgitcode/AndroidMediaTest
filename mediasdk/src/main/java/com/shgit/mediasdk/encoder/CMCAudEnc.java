@@ -173,7 +173,7 @@ public class CMCAudEnc {
         }
 
     }
-    
+
     // 编码线程
     Runnable encRawData = new Thread(new Runnable() {
         @Override
